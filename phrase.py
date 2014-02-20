@@ -347,7 +347,7 @@ print (Polinomio("3q+4w-5e+6r"))
 print (risolvi("a*(c+d)"))
 a = "  "
 while a != "":
-    a = input("vuoto per chiudere -->")
+    a = input("risolvi (vuoto per chiudere)-->")
     print (risolvi(a))
 #print risolvi("a143+b")
 
