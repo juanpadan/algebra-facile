@@ -2,140 +2,25 @@
 LETT="qwertyuiopasdfghjklzxcvbnm"
 NUM="1234567890"
 
-#debug
+import fractions
+Frac = fractions.Fraction
+#debug imports
 import code
 import readline
 import rlcompleter
+#fine debug imports
 
 #TODO supporto divisione e frazioni
 
-def risolvi(esp):
-    esp = esp + "\0" #fine esplicita
-    mon = 0
-    out = [] #lista di elementi
-    #TODO rimuovi spazi
-    #TODO verificate integrita' sintassi 
-    par = 0 #controlla che ogni parentesi si chiuda
-    for c in esp:
-        if c == "(":
-            par += 1
-        elif c == ")":
-            par -=1
-        if par == -1:
-            raise Exception("errore: parentesi non corrispondenti")
+"""
+lo scopo di questo modulo è fornire una classe Polinomio per gestire le
+espressioni e un phraser che data una stringa ritorna un oggetto Polinomio
+corrispondente all'espressione semplificata
 
-        if c == "/": #temporaneo
-            raise Exception("Ilsupporto alla divisione sara' presto aggiunto")
-    if par != 0:
-        raise Exception("errore: parentesi non corrispondenti")
-
-    tmp = ""#variabile ch prende il valore del monomio temporaneo
-    i = 0
-    pol = [] #lista di monomi
-    out = Polinomio([])
-    prec = Polinomio([])
-    #se vi e' una parentesi e poi un * o un  tmp avra' valore "" e prec sara' il valore della 
-    #parentesi ridotta a polinomio su cui saranno eseguite le normali operazioni
-    #eseguite con Polinomio(tmp)
-    while esp[i] != "\0":
-        if esp[i] in "*-" and esp[i+1] == "(":
-            s = esp[i]
-            if not prec.pol:
-                prec = Polinomio(tmp)
-            tmp=""
-            par = 1
-            i+=2
-            sub = ""
-            while par>0:
-                if esp[i]==")":
-                    par-=1
-                    if par>0:
-                        sub+=esp[i]
-                elif esp[i]=="(":
-                    par+=1
-                    sub+=esp[i]
-                else:
-                    sub += esp[i]
-                i+=1
-            if s == "*":
-                prec *= risolvi(sub)       #
-            elif s == "/":                 # puo' essere ottimizzato con multiprocessing
-                prec /= risolvi(sub)       #
-
-        elif esp[i] in "+-" and esp[i+1]=="(":
-            s = esp[i]
-            if prec.pol:
-                out += prec
-                prec = Polinomio([])
-            else:
-                out += Polinomio(tmp)
-                tmp = ""
-            sub = ""
-            i+=2
-            par = 1
-            while par>0:
-                if esp[i]==")":
-                    par-=1
-                    if par>0:
-                        sub+=esp[i]
-                elif esp[i]=="(":
-                    par+=1
-                    sub+=esp[i]
-                else:
-                    sub+=esp[i]
-                i+=1
-            if s == "+":
-                prec = Polinomio(sub)
-            elif s == "-":
-                prec -= Polinomio(sub)
-        
-        elif esp[i] == "(":#TODO fix ugly hack
-            esp=esp[:1]+"*"+esp[1:]
-
-        elif esp[i] in "+-":
-            if prec.pol:
-                out += prec
-                prec = Polinomio([])
-            else:
-                out += Polinomio(tmp)
-                tmp = ""
-                
-                
-            if esp[i]=="-":
-                tmp+="-"
-            i+=1
-      
-            
-        else:
-            tmp+=esp[i]
-            i+=1
-    #end wile
-        
-    if prec.pol:
-        out += prec
-        prec = Polinomio([])
-    else:
-        out += Polinomio(tmp)
-        tmp = ""
-    return out
+"""
 
 
-
-
-def prodotto_variabili(a,b):
-    """da due dizionari lettera:esponente ritorna il prodotto"""
-    out = {}
-    for lett, esp in a.items():
-        out.update({lett:esp})
-    for lett, esp in b.items():
-        if lett not in out:
-            out.update({lett:esp})
-        else:
-            t = out[lett]
-            out.update({lett:esp+t})
-    return out
-
-
+################################ polinomizzazione bruta ###################
 
 def compara_variabili(a,b):
     """verifica che due dizionari siano congruenti"""
@@ -155,41 +40,26 @@ def compara_variabili(a,b):
     else:
         return False
 
-
-
-
-
-
-def monomizza(esp):#ok
-    """trasforma in monomio un'espressione di sole moltiplicazioni, ritorna la coppia valore intero, lettere"""
-    #todo verifica integrita'
-    lista = []
-    mon = ""
-    for c in esp:
-        if c !="*":
-            mon +=c
+def prodotto_variabili(a,b,esp_a = 1,esp_b=1):
+    """da due dizionari lettera:esponente ritorna il prodotto e aggiungi un
+    evntuale esponente per ciascun dizionario per cui sara' moltiplicato
+    ciascun secondo termine del dizonario associato"""
+    out = {}
+    for lett, esp in a.items():
+        out.update({lett:esp*esp_a})
+    for lett, esp in b.items():
+        if lett not in out:
+            out.update({lett:esp*esp_b})
         else:
-            lista.append(mon)
-            mon = ""
-
-    lista.append(mon)
-
-    if len(lista)==0:
-        raise Exception("lista vuota")
-    coeficente = 1
-    lett = {}
-    for x in lista:
-        t,lt = interpreta_monomio(x)
-        lett = prodotto_variabili(lett,lt)
-        coeficente *= t
-
-    return (coeficente,lett)
+            t = out[lett]
+            out.update({lett:esp*esp_b+t})
+    return out
 
 
 def interpreta_monomio(esp):
-    """dato un monomio in forma ad esempio "5a2b4" lo trasforma in modo uniforme, ritorna
-    il valore intero, un dizionario lettera:esopnente"""
-    esp += " "#TODO sostituire con \0
+    """dato un monomio in forma ad esempio "5a2b4" lo trasforma in modo 
+    uniforme, ritorna il valore intero, un dizionario lettera:esopnente"""
+    esp += "\0"#TODO sostituire con \0
     x = ""#cifre di x poi convrtite da int
     lx = {}#lettere
     i = 0 #cursor
@@ -209,14 +79,15 @@ def interpreta_monomio(esp):
     #raccogli lettere
     while esp[i] in LETT:
         if esp[i+1] in NUM:#raccogli cifre esponente
-            cifre = ""#variabile temporanea in cui memorizza le cifre dell'esponente
+            cifre = ""
+            #variabile temporanea in cui memorizza le cifre dell'esponente
             lett = esp[i]
             i += 1
             while esp[i] in NUM:
                 cifre += esp[i]
                 i+=1
             lx.update({lett:int(cifre)}) #inserisci nel dict
-        elif esp[i]!=" ":
+        elif esp[i]!="\0":
             lx.update({esp[i]:1}) #quando la lettera e' gia' presente
             i+=1
         else:
@@ -229,10 +100,68 @@ def interpreta_monomio(esp):
     x = int(x)*neg
     return (x,lx)
 
+
+def monomizza(esp):#ok
+    """trasforma in monomio un'espressione di sole moltiplicazioni,
+    ritorna la coppia valore intero, lettere"""
+    #todo verifica integrita'
+    esp += "\0"
+    numeratore = []#lista dei monomi in forma canonica al numeratore
+    tmp = "" #stringa temporanea
+    denominatore = [] 
+    i = 0
+    prodotto = False
+    for c in esp:
+        tmp += c
+        if c in "*/":
+            prodotto = True
+            tmp = ""
+            break
+    
+    if not prodotto:
+        numeratore = [tmp]
+    else:#tutto sto casino solo se ci sono un * o un /
+        esp = "*"+esp # all'inizio della stringa mettti al numeratore
+        while esp[i]!="\0":
+            if esp[i] =="*":
+                i+=1
+                while esp[i] not in "*/\0": 
+                    tmp +=esp[i]
+                    i+=1
+                numeratore.append(tmp)
+                tmp = ""
+                
+            elif esp[i] =="/":
+                i+=1
+                while esp[i] not in "*/\0": 
+                    tmp +=esp[i]
+                    i+=1
+                denominatore.append(tmp)
+                tmp = ""
+    
+    #print(numeratore,"/",denominatore)
+    if len(numeratore)==0:
+        raise Exception("numeratore vuoto")
+    coeficente = Frac(1,1)
+    lett = {}
+    for monomio in numeratore:
+        t,lt = interpreta_monomio(monomio)
+        lett = prodotto_variabili(lett,lt)
+        coeficente *= t
+    
+    for monomio in denominatore:
+        t,lt = interpreta_monomio(monomio)
+        lett = prodotto_variabili(lett,lt,1,-1)
+        coeficente *= t    
+    
+
+    return (coeficente,lett)
+
+
 def polinomizza(esp):
     """da espressione priva di parentesi ricava polinomio come lista
     di coppie [valore,lettere]"""
-    esp = esp + " "
+    esp = esp
     out = []
     mon = ""
     for c in esp:
@@ -257,7 +186,9 @@ def semplifica_polinomio(lista):
         simile = False
         while j<len(out):
             simile = False
-            if compara_variabili(out[j][1],l[0][1]):#verifica che i monomi abbiano la stessa parte letterale
+            if compara_variabili(out[j][1],l[0][1]):
+                #^^^verifica che i monomi abbiano la stessa parte letterale
+                
                 v = out[j][0] #vecchio coeficente
                 out[j] = (v+l[0][0], l[0][1])
                 simile = True
@@ -277,13 +208,18 @@ def semplifica_polinomio(lista):
     return no0
 
 
-### classi
+########## classi
 #i monomi sono gestiti come coppie [coeficente,{let:esp,...}]
+#il coeficente e' un oggetto Fractions
+
+
+
 
 
 class Polinomio:
-    def __init__(self,val):
-        "accetta una stringa contenente un polinomio o un lista di monomi standard"
+    def __init__(self,val=[],den=[]):
+        """accetta una stringa contenente un polinomio 
+        o un lista di monomi standard"""
         # FORSE TODO spostare qui il codice della polinomizzazione
         #TODO aggiunger il supporo ai polinomi fratti
         if type(val)==type([]):
@@ -312,25 +248,42 @@ class Polinomio:
             for c2,v2 in altro.pol:
                 out.append([c1*c2,prodotto_variabili(v1,v2)])
         return Polinomio(semplifica_polinomio(out))
+    
+    def __truediv__(self,altro):
+        out =[]
+        for c1,v1 in self.pol:
+            for c2,v2 in altro.pol:
+                out.append([c1/c2,prodotto_variabili(v1,v2,1,-1)])
+        return Polinomio(semplifica_polinomio(out))
 
-    def appendi(self,altro):
-        self.pol.append(altro)
-        self.pol = semplifica_polinomio(self.pol)
+
 
     def __str__(self):
         out = ""
         for i,j in self.pol:
             if i>=0:
-                out += "+"
-            out+=str(i)
-            for v,e in j.items():
-                out+= v
-                if e>1:
-                    out+=str(e)
+                num = "+"+str(i.numerator)
+            else:
+                num=str(i.numerator)
+                
+            den = str(i.denominator)
+            for v,e in j.items():#FIXME eliminare variabili con esponente 0
+                if e == 1:
+                    num += v
+                elif e >1:
+                    num += v+str(e)
+                else:
+                    den += v+str(int(-e))
+            out += num
+            if den != "1":
+                out += "/"+den
         return out
+    
+    def __repr__(self):
+        return self.__str__()
+
 
     def esegui_operazione(self,operatore,altro):
-
         if operatore == "+":
             return self+altro
 
@@ -340,16 +293,220 @@ class Polinomio:
         if operatore == "*":
             return self*altro
 
+
+########################### Risolutore ################################
+
+def controlla_sintassi(esp):
+    """questa funzione interrompe l'esecuzione del programma 
+    (allo stato attuale) in caso di sintassi non valida"""
+    #TODO aggiungere controlli piu' profondi:
+    #riduzzione spazi
+    #segni vaganti a inizio e fine linea
+    par = 0 #controlla che ogni parentesi si chiuda
+    for c in esp:
+        if c == "(":
+            par += 1
+        elif c == ")":
+            par -=1
+        if par == -1:
+            raise Exception("errore: parentesi non corrispondenti")
+    if par != 0:
+        raise Exception("errore: parentesi non corrispondenti")
+
+def raggruppa(indice,stringa):
+    """accetta indice di inizio della parentesi e la stringa, raggruppa 
+    in una stringa il contenuto della parentesi. Ritorna il la coppia 
+    (nuovoinidice,stringa)"""
+    
+    indice+=1
+    inizio = indice
+    par = 1
+    out = ""
+    while par>0:
+        
+        if stringa[indice]=="(":
+            par +=1
+        elif stringa[indice]==")":
+            par -=1
+        indice+=1
+    return (indice,stringa[inizio:indice-1])
+
+
+
+def tokenizza(esp):
+    """separa monomi e se espressioni in una lista eg:
+    [Polinomio(a),Polinomio(b),Polinomio(c),"*",Polinomio(d)]"""
+    i = 0
+    out = []
+    tmp = ""
+    while i<len(esp):
+        
+        if esp[i] in "+-":
+            out.append(Polinomio(tmp))
+            tmp = esp[i]
+            i+=1
+            
+        elif esp[i] in "*/":
+            if esp[i+1]=="(":
+                out.append(Polinomio(tmp))
+                out.append(esp[i])
+                tmp=""
+            elif esp[i-1]==")":    
+                out.append(esp[i])
+            else:
+                tmp+=esp[i]#la monomizzazzione tratta gia' il prodotto
+            i+=1
+            
+        elif esp[i] == "(":
+            i,sub = raggruppa(i,esp)#i e' gia' al carattere successivo
+            out.append(risolvi(sub))
+        
+        else:
+            tmp+=esp[i]
+            i+=1
+            
+    out.append(Polinomio(tmp))
+    return list(out)
+
+def risolvi(esp):
+    controlla_sintassi(esp)#eccezione se invalida
+    lista = tokenizza(esp)
+    
+    out = []
+    i = 0
+    while i<len(lista):
+        if type(lista[i])==type(str()):
+            out[-1] = out[-1].esegui_operazione(lista[i],lista[i+1])
+            i+=2
+        else:
+            out.append(lista[i])
+            i+=1
+    pol = Polinomio([])
+    for p in out:
+        pol+=p
+    return pol
+            
+"""
+def vecchio_risolvi(esp):
+    esp = esp + "\0" #fine esplicita
+    #TODO commentare meglio
+    #TODO verificate integrita' sintassi
+    par = 0 #controlla che ogni parentesi si chiuda
+    for c in esp:
+        if c == "(":
+            par += 1
+        elif c == ")":
+            par -=1
+        if par == -1:
+            raise Exception("errore: parentesi non corrispondenti")
+    if par != 0:
+        raise Exception("errore: parentesi non corrispondenti")
+    if ")*" in esp:
+        raise Exception("funzione non ancora supportata )*")
+
+    tmp = ""#variabile ch prende il valore del monomio temporaneo
+    i = 0 #cursore
+    pol = [] #lista di monomi
+    out = Polinomio([])
+    prec = Polinomio([])
+    #se vi e' una parentesi e poi un * o un  tmp avra' valore "" e prec sara' il valore della 
+    #parentesi ridotta a polinomio su cui saranno eseguite le normali operazioni
+    #eseguite con Polinomio(tmp)
+    while esp[i] != "\0":
+        if esp[i] in "*/" and esp[i+1] == "(":
+            s = esp[i]
+            if not prec.pol:
+                prec = Polinomio(tmp)
+            tmp=""
+            par = 1
+            i+=2
+            sub = ""
+            while par>0:
+                if esp[i]==")":
+                    par-=1
+                    if par>0:
+                        sub+=esp[i]
+                elif esp[i]=="(":
+                    par+=1
+                    sub+=esp[i]
+                else:
+                    sub += esp[i]
+                i+=1
+            if s == "*":
+                prec *= risolvi(sub)       #
+            elif s == "/":                 # puo' essere ottimizzato con multiprocessing
+                prec /= risolvi(sub)       #
+          
+
+        elif esp[i] in "+-" and esp[i+1]=="(":
+            s = esp[i]
+            if prec.pol:
+                out += prec
+                prec = Polinomio([])
+            else:
+                out += Polinomio(tmp)
+                tmp = ""
+            sub = ""
+            i+=2
+            par = 1
+            while par>0:
+                if esp[i]==")":
+                    par-=1
+                    if par>0:
+                        sub+=esp[i]
+                elif esp[i]=="(":
+                    par+=1
+                    sub+=esp[i]
+                else:
+                    sub+=esp[i]
+                i+=1
+                
+            if s == "+":
+                prec = Polinomio(sub)
+            elif s == "-":
+                prec -= Polinomio(sub)
+        
+        elif esp[i] == "(":#per i pigri che non specicicano...
+            esp=esp[:i]+"*"+esp[i:]
+
+        elif esp[i] in "+-":
+            if prec.pol:
+                out += prec
+                prec = Polinomio([])
+            else:
+                out += Polinomio(tmp)
+                tmp = ""
+                    
+            if esp[i]=="-":
+                tmp+="-"
+            i+=1      
+            
+        else:
+            tmp+=esp[i]
+            i+=1
+    #end while
+        
+    if prec.pol:
+        out += prec
+        prec = Polinomio([])
+    else:
+        out += Polinomio(tmp)
+        tmp = ""
+    return out
+
+"""
+
 ###test code
 
-##print polinomizza("3a3b5*2b+3")
-print (Polinomio("3q+4w-5e+6r"))
-print (risolvi("a*(c+d)"))
-a = "  "
+print("semplifica un'espressione algebrica (vuoto per chiudere)")
+print("per convenzione 3ac/2b=(3ac)/(2b)")
+print("esplicitare la moltiplicazione prima di una parentesi:")
+print("21(a+b) = 21+a+b, 21*(a+b) = 21a+21b")
+a = "babagia"
 while a != "":
-    a = input("risolvi (vuoto per chiudere)-->")
+    a = input("-->")
     print (risolvi(a))
-#print risolvi("a143+b")
+
 
 #avvia console
 p = Polinomio #accesso piu' semplice al Polinomi
