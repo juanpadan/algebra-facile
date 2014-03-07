@@ -152,7 +152,7 @@ def monomizza(esp):#ok
     for monomio in denominatore:
         t,lt = interpreta_monomio(monomio)
         lett = prodotto_variabili(lett,lt,1,-1)
-        coeficente *= t    
+        coeficente /= t    
     
 
     return (coeficente,lett)
